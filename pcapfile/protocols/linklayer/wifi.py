@@ -334,6 +334,9 @@ class Radiotap(ctypes.Structure):
         if self.present_channel:
             idx += self.strip_channel(idx)
 
+	if self.present_dbm_antsignal:
+            self.strip_signal(idx)
+
         self.prot_type = self.extract_protocol()
 
     def strip_vers(self, idx):
@@ -457,6 +460,17 @@ class Radiotap(ctypes.Structure):
         self.chan_half_rate = int(self._bits['channel_flags'][14])
         self.chan_quarter_rate = int(self._bits['channel_flags'][15])
         return 4
+
+    def strip_signal(self, idx):
+        """strip(1 byte) radiotap.signal
+	note that, this value is dbm signal strength
+        :idx: int
+        :returns: int
+            number of processed bytes
+        """
+        self._raw['signal'] = self._rtap[idx]
+        self.signal = struct.unpack('b', self._rtap[idx:idx+1])[0] #dbm
+        return 1
 
     def extract_protocol(self):
         """extract 802.11 protocol from radiotap.channel.flags
