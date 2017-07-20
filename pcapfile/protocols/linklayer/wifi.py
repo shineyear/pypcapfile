@@ -320,6 +320,9 @@ class Radiotap(ctypes.Structure):
         idx += self.strip_len(idx)
         idx += self.strip_present(idx)
 
+        if self.present_ext:
+            idx += 4
+
         if self.present_tsft:
             idx += self.strip_tsft(idx)
 
@@ -328,13 +331,13 @@ class Radiotap(ctypes.Structure):
 
         if self.present_rate:
             self.strip_rate(idx)
+            idx += 1 #null byte exists, even if rate flag = 0
 
-        idx += 1 #null byte exists, even if rate flag = 0
 
         if self.present_channel:
             idx += self.strip_channel(idx)
 
-	if self.present_dbm_antsignal:
+        if self.present_dbm_antsignal:
             self.strip_signal(idx)
 
         self.prot_type = self.extract_protocol()
@@ -373,6 +376,9 @@ class Radiotap(ctypes.Structure):
         :returns: int
             number of processed bytes
         """
+
+        ret = 4
+
         self._raw['present'] = self._rtap[idx:idx+4]
         present_val = struct.unpack('<L', self._raw['present'])[0]
         self._bits['present'] = format(present_val, '032b')[::-1]
@@ -395,7 +401,15 @@ class Radiotap(ctypes.Structure):
         self.present_mcs = int(self._bits['present'][19])
         self.present_ampdu = int(self._bits['present'][20])
         self.present_vht = int(self._bits['present'][21])
-        return 4
+        self.present_reserved = int(self._bits['present'][22:28])
+        self.present_radiotap_next = int(self._bits['present'][29])
+        self.present_vendor_next = int(self._bits['present'][30])
+        self.present_ext = int(self._bits['present'][31])
+
+        if self.present_radiotap_next:
+            return ret + 4
+
+        return ret
 
     def strip_tsft(self, idx):
         """strip(8 byte) radiotap.mactime timestap value
@@ -463,7 +477,7 @@ class Radiotap(ctypes.Structure):
 
     def strip_signal(self, idx):
         """strip(1 byte) radiotap.signal
-	note that, this value is dbm signal strength
+	    note that, this value is dbm signal strength
         :idx: int
         :returns: int
             number of processed bytes
@@ -559,6 +573,9 @@ class Wifi(ctypes.Structure):
         for key, val in attrs.items():
             if key[0] != '_':
                 print("%s: %s" % (key, val))
+
+    def get_fcs(self):
+        return self.radiotap.fcs
 
     @staticmethod
     def get_mac_addr(mac_addr):
@@ -798,7 +815,7 @@ class Management(Wifi):
         return self.name
 
     @staticmethod
-    def parse_tagged_params(raw_tagged_params):
+    def parse_tagged_params(raw_tagged_params, fcs=0):
         """strip tagged information elements wlan_mgt.tag
         which has generic type-length-value structure
         [type, length, value]
@@ -812,10 +829,16 @@ class Management(Wifi):
         """
         idx = 0
         tagged_params = []
-        while idx < len(raw_tagged_params):
+
+        raw_len = len(raw_tagged_params)
+
+        if fcs:
+            raw_len = len(raw_tagged_params) - 4
+
+        while idx < raw_len:
             tag_num, tag_len = struct.unpack('BB', raw_tagged_params[idx:idx+2])
             idx += 2
-            if len(raw_tagged_params) >= idx + tag_len:
+            if raw_len >= idx + tag_len:
                 param = {}
                 param['number'], param['length'] = tag_num, tag_len
                 payload = raw_tagged_params[idx:idx+tag_len]
@@ -832,10 +855,10 @@ class Management(Wifi):
             else:
                 logging.warn('out tag length header points out of boundary')
                 log_msg = 'index: {p_idx}, pack_len: {p_len}'
-                log_msg = log_msg.format(p_idx=idx+tag_len,
-                        p_len=len(raw_tagged_params))
+                log_msg = log_msg.format(p_idx=idx+tag_len, p_len=raw_len)
                 logging.warn(log_msg)
                 return 1, tagged_params
+
         return 0, tagged_params
 
     @staticmethod
@@ -1029,6 +1052,7 @@ class ProbeReq(Management):
         """
         Management.__init__(self, frame)
         idx = 0
+        fcs = self.get_fcs()
         seq_idx, qos_idx = self.strip_mac_addrs(self.to_ds, self.from_ds)
         idx = seq_idx
         self.strip_seq_cntrl(idx)
@@ -1036,7 +1060,7 @@ class ProbeReq(Management):
         if idx < len(self._packet):
             self._raw_tagged_params = self._packet[idx:]
             is_out_bound, tagged_params =\
-                self.parse_tagged_params(self._raw_tagged_params)
+                self.parse_tagged_params(self._raw_tagged_params, fcs)
             if len(tagged_params):
                 self.tagged_params = tagged_params
             if is_out_bound:

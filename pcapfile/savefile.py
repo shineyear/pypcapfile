@@ -125,7 +125,7 @@ def load_savefile(input_file, layers=0, verbose=False, lazy=False):
     old_verbose = VERBOSE
     VERBOSE = verbose
 
-    #__TRACE__('[+] attempting to load {:s}', (input_file.name,))
+    __TRACE__('[+] attempting to load {:s}', (input_file.name,))
 
     header = _load_savefile_header(input_file)
     if __validate_header__(header):
