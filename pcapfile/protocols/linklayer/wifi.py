@@ -904,10 +904,17 @@ class Management(Wifi):
             {'oui':00-11-22, 'oui_type':1, 'oui_data':ctypes.structure}
         """
         output = {}
+        oui_data = ""
+        oui_type = ""
         oui = struct.unpack('BBB', payload[0:3])
         oui = b'-'.join([('%02x' % o).encode('ascii') for o in oui])
-        oui_type = struct.unpack('B', payload[3])[0]
-        oui_data = payload[4:]
+
+        if len(payload) < 4:
+            logging.warn("can not parse vendor ie")
+        else:
+            oui_type = struct.unpack('B', payload[3])[0]
+            oui_data = payload[4:]
+
         output['oui'] = oui.upper()
         output['oui_type'] = oui_type
         output['oui_data'] = oui_data
