@@ -11,22 +11,22 @@ class Ethernet(ctypes.Structure):
     """
     Represents an Ethernet frame.
     """
-
-    _fields_ = [('dst', ctypes.c_char_p),
-                ('src', ctypes.c_char_p),
-                ('type', ctypes.c_ushort)]
+    _fields_ = [('type', ctypes.c_ushort),
+                ('duration', ctypes.c_ushort),
+                ('dst', ctypes.c_char_p),
+                ('src', ctypes.c_char_p)]
 
     payload = None
 
     def __init__(self, packet, layers=0):
-        (dst, src, self.type) = struct.unpack('!6s6sH', packet[:14])
+        (self.type, self.duration, dst, src) = struct.unpack('!HH6s6s', packet[:16])
 
         dst = bytearray(dst)
         src = bytearray(src)
         self.dst = b':'.join([('%02x' % o).encode('ascii') for o in dst])
         self.src = b':'.join([('%02x' % o).encode('ascii') for o in src])
 
-        payload = binascii.hexlify(packet[14:])
+        payload = binascii.hexlify(packet[16:])
         self.payload = payload
 
         if layers:
