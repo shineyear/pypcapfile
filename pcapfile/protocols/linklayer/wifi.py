@@ -922,7 +922,7 @@ class Management(Wifi):
         oui = b'-'.join([('%02x' % o).encode('ascii') for o in oui])
 
         if len(payload) < 4:
-            logging.warn("can not parse vendor ie")
+            logging.warn("can not parse vendor type")
         else:
             oui_type = struct.unpack('B', payload[3])[0]
             oui_data = payload[4:]
