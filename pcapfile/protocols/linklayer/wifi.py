@@ -828,6 +828,8 @@ class Management(Wifi):
             0 in succ, 1 for
         """
         idx = 0
+        tag_num = 0 
+        tag_len = 0
         tagged_params = []
 
         raw_len = len(raw_tagged_params)
@@ -835,9 +837,18 @@ class Management(Wifi):
         if fcs:
             raw_len = len(raw_tagged_params) - 4
 
+
         while idx < raw_len:
-            tag_num, tag_len = struct.unpack('BB', raw_tagged_params[idx:idx+2])
-            idx += 2
+            if raw_len >= idx + 2:
+                tag_num, tag_len = struct.unpack('BB', raw_tagged_params[idx:idx+2])
+                idx += 2
+            else:
+                logging.warn('out tag length header points out of boundary')
+                log_msg = 'index: {p_idx}, pack_len: {p_len}'
+                log_msg = log_msg.format(p_idx=idx+tag_len, p_len=raw_len)
+                logging.warn(log_msg)
+                return 1, tagged_params
+
             if raw_len >= idx + tag_len:
                 param = {}
                 param['number'], param['length'] = tag_num, tag_len
@@ -858,6 +869,7 @@ class Management(Wifi):
                 log_msg = log_msg.format(p_idx=idx+tag_len, p_len=raw_len)
                 logging.warn(log_msg)
                 return 1, tagged_params
+
 
         return 0, tagged_params
 
